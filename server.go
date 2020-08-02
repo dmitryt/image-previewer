@@ -1,140 +1,106 @@
 package main
 
 import (
+	"io"
 	"context"
 	"errors"
-	"bytes"
-	"fmt"
-	"image"
-	"image/jpeg"
-	"io/ioutil"
-	"log"
-	"net/http"
 	"os"
-	"path"
+	"fmt"
 	"strconv"
-	"strings"
+	"net/http"
 
-	"github.com/disintegration/imaging"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"github.com/joho/godotenv"
 )
-
-var cacheDir = ".cache"
 
 var (
 	ErrInvalidUri = errors.New("Invalid URI. Expected format is: /<method>/<width>/<height>/<external url>")
+	ErrInvalidResponse = errors.New("External service returns invalid response")
+	ErrMaxResponseSize = errors.New("Response size is greater, than accepted")
+	ErrUnsupportedFileType = errors.New("File type is not supported. Supported file types: jpeg, png, gif")
 )
 
-type UrlParams struct {
-	method      string
-	height      int
-	width       int
-	filename    string
-	externalUrl string
-}
+var cache Cache
 
-func atoi(val string) int {
-	result, err := strconv.Atoi(val)
+func fetch(url string, header http.Header) (*http.Response, error) {
+	client := http.DefaultClient
+	ctx := context.Background()
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		return 0
+		return nil, err
 	}
-	return result
-}
-
-func parseUrl(url string) (UrlParams, error) {
-	paths := strings.Split(url, "/")
-	if len(paths) < 4 {
-		return UrlParams{}, ErrInvalidUri
-	}
-	return UrlParams{
-		method:      paths[0],
-		width:       atoi(paths[1]),
-		height:      atoi(paths[2]),
-		filename:    paths[len(paths)-1],
-		externalUrl: strings.Join(paths[3:], "/"),
-	}, nil
+	req.Header = header
+	return client.Do(req)
 }
 
 // Example: http://cut-service.com/fill/300/200/www.audubon.org/sites/default/files/a1_1902_16_barred-owl_sandra_rothenberg_kk.jpg
 func handler(w http.ResponseWriter, r *http.Request) {
-	urlParams, err := parseUrl(r.URL.Path[1:])
-	if err != nil {
-		fmt.Fprintf(w, "ERRRR %s!", err)
+	urlParams := parseUrl("/" + r.URL.Path[1:])
+	if !urlParams.valid {
+		fmt.Fprintf(w, "ERRRR %s!", ErrInvalidUri)
 	}
-	log.Println("[DEBUG] parsed url params", urlParams)
-	client := http.DefaultClient
-	ctx := context.Background()
-	req, err := http.NewRequestWithContext(ctx, "GET", "http://"+urlParams.externalUrl, nil)
-	if err != nil {
-		fmt.Fprintf(w, "ERRRR %s!", err)
-		return
-	}
-	req.Header = r.Header
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Fprintf(w, "ERRRR %s!", err)
-		return
-	}
-	log.Println("[DEBUG] fetched image")
-	defer resp.Body.Close()
+	log.Debug().Msgf("parsed url params %+v", urlParams)
 
-	// Prepare dirs
-	baseDirPath := path.Join(cacheDir, urlParams.externalUrl, fmt.Sprintf("%sx%s", urlParams.width, urlParams.height))
-	err = os.MkdirAll(baseDirPath, 0755)
-	if err != nil {
-		fmt.Fprintf(w, "ERRRR %s!", err)
-		return
+	cacheDir, ok := os.LookupEnv("CACHE_DIR")
+	if !ok {
+		cacheDir = ".cache"
 	}
-	log.Println("[DEBUG] created directories", baseDirPath)
 
-	// Create file
-	filePath := path.Join(baseDirPath, urlParams.filename)
-	f, err := os.Create(filePath)
+	fm := FileManager{urlParams: urlParams, cacheDir: cacheDir}
+
+	if _, ok := cache.Get(Key(fm.GetFilePath())); !ok {
+		resp, err := fetch("http://" + urlParams.externalURL, r.Header)
+		if err != nil {
+			fmt.Fprintf(w, "ERRRR %s!", err)
+		}
+		defer resp.Body.Close()
+		err = fm.PrepareFile(io.LimitReader(resp.Body, int64(atoi(os.Getenv("MAX_FILE_SIZE"), 5*1024*1024))))
+		if err != nil {
+			fmt.Fprintf(w, "ERRRR %s!", err)
+		}
+	}
+
+	f, err := fm.GetFile()
 	if err != nil {
 		fmt.Fprintf(w, "ERRRR %s!", err)
-		return
 	}
-	log.Println("[DEBUG] created file", filePath)
 	defer f.Close()
 
-	// Copy data to file
-	decoded, _, err := image.Decode(resp.Body)
+	contentType := fm.GetFileMimeType(f)
+	fileInfo, err := f.Stat()
 	if err != nil {
 		fmt.Fprintf(w, "ERRRR %s!", err)
-		return
 	}
-	resized, err := resize(&decoded, urlParams.width, urlParams.height)
-	_, err = f.Write(resized)
-	if err != nil {
-		fmt.Fprintf(w, "ERRRR %s!", err)
-		return
-	}
+	//Send the headers
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Length", strconv.FormatInt(fileInfo.Size(), 10)) //Get file size as a string
 
-	// Retunr to client
-	content, err := ioutil.ReadFile(filePath)
+	_, err = io.Copy(w, f)
 	if err != nil {
 		fmt.Fprintf(w, "ERRRR %s!", err)
-		return
-	}
-	log.Println("[DEBUG] return to client", filePath)
-	_, err = w.Write(content)
-	if err != nil {
-		fmt.Fprintf(w, "ERRRR %s!", err)
-		return
 	}
 }
 
-func resize(src *image.Image, width, height int) ([]byte, error) {
-	buf := new(bytes.Buffer)
-	imaging := imaging.Resize(*src, width, height, imaging.Lanczos)
-	err := jpeg.Encode(buf, imaging, nil)
-	if err != nil {
-		return nil, err
-	} else {
-		return buf.Bytes(), nil
+func init() {
+	var val interface{}
+	val, ok := os.LookupEnv("LOG_LEVEL")
+	logLevel, ok := val.(zerolog.Level)
+	if !ok {
+		logLevel = zerolog.DebugLevel
 	}
+	zerolog.SetGlobalLevel(logLevel)
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: zerolog.TimeFieldFormat})
+	err := godotenv.Load()
+  if err != nil {
+    log.Fatal().Msg("Error loading .env file")
+	}
+	cache = NewCache(atoi(os.Getenv("CACHE_SIZE"), 10))
 }
 
 func main() {
 	http.HandleFunc("/", handler)
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	if err := http.ListenAndServe("localhost:" + os.Getenv("PORT"), nil); err != nil {
+    log.Fatal().Err(err).Msg("Startup failed")
+	}
 }
