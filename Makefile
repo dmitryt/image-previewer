@@ -3,15 +3,18 @@ GOCMD=go
 GOBUILD=$(GOCMD) build
 GOCLEAN=$(GOCMD) clean
 GOTEST=$(GOCMD) test
+GOLINT=golangci-lint run
 GOGET=$(GOCMD) get
-BINARY_NAME=previewer
+BINARY_NAME=image-previewer
 
-all: test build
+all: test lint build
 build:
-  GOOS=linux GOARCH=amd64 go build
-  docker build -t consignment .
+	GOOS=linux GOARCH=amd64 go build
+	docker build -t consignment .
 test:
-	$(GOTEST) -v ./...
+	$(GOTEST) -v -race -count 100 ./...
+lint:
+	$(GOLINT) ./...
 clean:
 	$(GOCLEAN)
 	rm -f $(BINARY_NAME)
