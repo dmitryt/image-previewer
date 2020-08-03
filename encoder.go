@@ -2,19 +2,19 @@ package main
 
 import (
 	"image"
-	"io"
+	"image/gif"
 	"image/jpeg"
 	"image/png"
-	"image/gif"
+	"io"
 )
 
 type Encoder interface {
 	encode(io.Writer, image.Image) error
 }
 
-type JpegEncoder struct {}
-type PngEncoder struct {}
-type GifEncoder struct {}
+type JpegEncoder struct{}
+type PngEncoder struct{}
+type GifEncoder struct{}
 
 func (r JpegEncoder) encode(w io.Writer, img image.Image) error {
 	return jpeg.Encode(w, img, nil)

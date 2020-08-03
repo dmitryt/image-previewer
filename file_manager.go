@@ -1,49 +1,51 @@
 package main
 
 import (
-	"crypto/md5"
-	"io"
-	"os"
-	"io/ioutil"
-	"path"
+	"crypto/sha512"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net/http"
+	"os"
+	"path"
 
 	"github.com/rs/zerolog/log"
 )
 
 type FileManager struct {
-	cacheDir string
+	cacheDir  string
 	urlParams URLParams
 }
 
-type FileInfo struct {
-	fileContentType string;
-	fileSize int64;
-}
-
-func (fm FileManager) GetDirPath() string {
+func (fm FileManager) GetCacheKey() string {
 	width := fm.urlParams.width
 	height := fm.urlParams.height
-	h := md5.New()
-	io.WriteString(h, fmt.Sprintf("%s/%dx%d", fm.urlParams.externalURL, width, height))
-	return path.Join(fm.cacheDir, fmt.Sprintf("%x", h.Sum(nil)))
+	h := sha512.New()
+	_, _ = io.WriteString(h, fmt.Sprintf("%s/%dx%d", fm.urlParams.externalURL, width, height))
+	return string([]rune(fmt.Sprintf("%x", h.Sum(nil)))[0:64])
 }
 
 func (fm FileManager) GetFilePath() string {
-	return path.Join(fm.GetDirPath(), fm.urlParams.filename)
+	return path.Join(fm.cacheDir, fm.GetCacheKey())
 }
 
 func (fm FileManager) GetFile() (*os.File, error) {
 	return os.Open(fm.GetFilePath())
 }
 
-func (fm FileManager) GetFileMimeType(f *os.File) string {
+func (fm FileManager) GetFileMimeType(f *os.File) (result string, err error) {
 	fileHeader := make([]byte, 512)
-	f.Read(fileHeader)
-	f.Seek(0, 0)
+	_, err = f.Read(fileHeader)
+	if err != nil {
+		return
+	}
+	_, err = f.Seek(0, 0)
+	if err != nil {
+		return
+	}
 	//Get content type of file
-	return http.DetectContentType(fileHeader)
+	result = http.DetectContentType(fileHeader)
+	return
 }
 
 func (fm FileManager) PrepareFile(r io.Reader) (err error) {
@@ -52,20 +54,21 @@ func (fm FileManager) PrepareFile(r io.Reader) (err error) {
 	if err != nil {
 		return
 	}
-	io.Copy(tmpFile, r)
-	tmpFile.Seek(0, 0)
-	log.Debug().Msgf("tmp file created %s", tmpFile.Name())
-	defer os.Remove(tmpFile.Name())
-
-	// Prepare dirs
-	baseDirPath := fm.GetDirPath()
-	err = os.MkdirAll(baseDirPath, 0755)
+	_, err = io.Copy(tmpFile, r)
 	if err != nil {
 		return
 	}
-	log.Debug().Msgf("created directories %s", baseDirPath)
+	_, err = tmpFile.Seek(0, 0)
+	if err != nil {
+		return
+	}
+	log.Debug().Msgf("tmp file created %s", tmpFile.Name())
+	defer os.Remove(tmpFile.Name())
 
-	mimeType := fm.GetFileMimeType(tmpFile)
+	mimeType, err := fm.GetFileMimeType(tmpFile)
+	if err != nil {
+		return
+	}
 	log.Debug().Msgf("found mimeType: %s", mimeType)
 	encoder := NewEncoder(mimeType)
 	if encoder == nil {
@@ -80,6 +83,6 @@ func (fm FileManager) PrepareFile(r io.Reader) (err error) {
 	}
 	log.Debug().Msgf("created file %s", fm.GetFilePath())
 	defer f.Close()
-  err = encoder.encode(f, resized.SubImage(resized.Rect))
+	err = encoder.encode(f, resized.SubImage(resized.Rect))
 	return
 }

@@ -1,12 +1,11 @@
 package main
 
 import (
+	"image"
 	"io"
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
-	"image"
 
 	"github.com/disintegration/imaging"
 )
@@ -17,12 +16,12 @@ type URLParams struct {
 	width       int
 	filename    string
 	externalURL string
-	valid bool
+	valid       bool
 }
 
 var urlRe = regexp.MustCompile(`/fill/(\d+)/(\d+)/(.*)?`)
 
-func parseUrl(url string) URLParams {
+func parseURL(url string) URLParams {
 	if !urlRe.MatchString(url) {
 		return URLParams{valid: false}
 	}
@@ -39,12 +38,8 @@ func parseUrl(url string) URLParams {
 		height:      height,
 		filename:    paths[len(paths)-1],
 		externalURL: externalURL,
-		valid: true,
+		valid:       true,
 	}
-}
-
-func stringifyURL(u URLParams) string {
-	return fmt.Sprintf("/%d/%d/%s", u.width, u.height, u.externalURL)
 }
 
 func resize(r io.Reader, urlParams URLParams) (result *image.NRGBA, err error) {

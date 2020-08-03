@@ -1,4 +1,4 @@
-package main //nolint:golint,stylecheck
+package main
 
 import (
 	"fmt"

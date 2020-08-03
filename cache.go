@@ -1,6 +1,10 @@
-package main //nolint:golint,stylecheck
+package main
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -9,10 +13,12 @@ type Key string
 type Cache interface {
 	Set(key Key, value interface{}) bool
 	Get(key Key) (interface{}, bool)
+	GetDir() string
 	Clear()
 }
 
 type lruCache struct {
+	dir      string
 	capacity int
 	queue    List
 	items    map[Key]*listItem
@@ -24,8 +30,32 @@ type cacheItem struct {
 	value interface{}
 }
 
-func NewCache(capacity int) Cache {
-	return &lruCache{capacity: capacity, queue: NewList(), items: make(map[Key]*listItem)}
+func NewCache(capacity int, dir string) (Cache, error) {
+	cache := &lruCache{capacity: capacity, dir: dir, queue: NewList(), items: make(map[Key]*listItem)}
+	err := cache.Init()
+	return cache, err
+}
+
+func (c *lruCache) GetDir() string {
+	return c.dir
+}
+
+func (c *lruCache) Init() error {
+	// Prepare dir
+	err := os.MkdirAll(c.dir, 0755)
+	if err != nil {
+		return err
+	}
+	return filepath.Walk(c.dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		fmt.Println(path, info.IsDir(), strings.HasPrefix(filepath.Base(path), "."))
+		if !info.IsDir() && !strings.HasPrefix(filepath.Base(path), ".") {
+			c.Set(Key(filepath.Base(path)), path)
+		}
+		return nil
+	})
 }
 
 func (c *lruCache) Get(key Key) (interface{}, bool) {
