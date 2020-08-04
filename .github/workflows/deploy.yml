@@ -53,18 +53,21 @@ jobs:
       - name: Build
         run: make build
 
-  # publish:
-  #   name: Publish
-  #   runs-on: ubuntu-latest
-  #   needs: [build]
-  #   steps:
-  #     - name: Set up Go
-  #       uses: actions/setup-go@v2
-  #       with:
-  #         go-version: 1.14
-
-  #     - name: Check out code
-  #       uses: actions/checkout@v2
-
-  #     - name: Publish
-  #       run: make publish
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      steps:
+        - uses: actions/checkout@master
+        - name: Get release version
+          id: get_version
+          run: echo ::set-env name=RELEASE_VERSION::$(echo ${GITHUB_REF:10})
+        - name: Publish to Registry
+          uses: elgohr/Publish-Docker-Github-Action@master
+          env:
+            GOOS: linux
+            GOARCH: amd64
+          with:
+            name: greml1n/image-previewer
+            tags: "latest,${{ env.RELEASE_VERSION }}"

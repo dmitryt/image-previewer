@@ -103,7 +103,7 @@ func init() {
 	if ok {
 		logLevel, _ = val.(zerolog.Level)
 	} else {
-		logLevel = zerolog.DebugLevel
+		logLevel = zerolog.InfoLevel
 	}
 	zerolog.SetGlobalLevel(logLevel)
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: zerolog.TimeFieldFormat})

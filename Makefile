@@ -7,10 +7,7 @@ GOLINT=golangci-lint run
 GOGET=$(GOCMD) get
 BINARY_NAME=image-previewer
 
-all: test lint build
-build:
-	GOOS=linux GOARCH=amd64 go build
-	docker build -t consignment .
+all: clean test lint build
 test:
 	$(GOTEST) -v -race -count 100 ./...
 lint:
