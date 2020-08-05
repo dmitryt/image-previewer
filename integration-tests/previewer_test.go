@@ -22,8 +22,8 @@ var (
 	resizedImgsFolder = filepath.Join("testdata", "resized")
 )
 
-func loadImgFromHttp(url string) (result image.Image, err error) {
-	resp, err := http.Get(url)
+func loadImgFromHTTP(url string) (result image.Image, err error) {
+	resp, err := http.Get("http://localhost:8082" + url)
 	if err != nil {
 		return
 	}
@@ -51,28 +51,28 @@ func loadImgFromFile(filename string) (image.Image, error) {
 
 func TestResize(t *testing.T) {
 	type test struct {
-		inputUrl     string
+		inputURL     string
 		expectedFile string
 	}
 
 	t.Run("should resize images correctly", func(t *testing.T) {
-		urlString := "http://localhost:8082/fill/%d/%d/nginx/_gopher_original_1024x504.%s"
+		urlString := "/fill/%d/%d/nginx/_gopher_original_1024x504.%s"
 		fileNameString := "gopher_%dx%d.%s"
 		sizes := [][]int{
-			[]int{50, 50},
-			[]int{200, 700},
-			[]int{256, 126},
-			[]int{333, 666},
-			[]int{500, 500},
-			[]int{1024, 252},
-			[]int{2000, 1000},
+			{50, 50},
+			{200, 700},
+			{256, 126},
+			{333, 666},
+			{500, 500},
+			{1024, 252},
+			{2000, 1000},
 		}
 		extensions := []string{"jpg", "png", "gif"}
 		var tests []test
 		for _, ext := range extensions {
 			for _, size := range sizes {
 				tests = append(tests, test{
-					inputUrl:     fmt.Sprintf(urlString, size[0], size[1], ext),
+					inputURL:     fmt.Sprintf(urlString, size[0], size[1], ext),
 					expectedFile: fmt.Sprintf(fileNameString, size[0], size[1], ext),
 				})
 			}
@@ -81,7 +81,7 @@ func TestResize(t *testing.T) {
 		for _, tc := range tests {
 			expectedImg, err := loadImgFromFile(filepath.Join(resizedImgsFolder, tc.expectedFile))
 			require.NoError(t, err, "Error, while reading the image from file")
-			actualImg, err := loadImgFromHttp(tc.inputUrl)
+			actualImg, err := loadImgFromHTTP(tc.inputURL)
 			require.NoError(t, err, "Error, while fetching the image")
 			_, intRes, err := comparator.Compare(expectedImg, actualImg)
 			require.NoError(t, err, "Error, while comparing images")
