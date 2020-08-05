@@ -10,6 +10,10 @@ BINARY_NAME=image-previewer
 all: clean test lint build
 test:
 	$(GOTEST) -v -race -count 100 ./...
+integration-test:
+	docker-compose -f integration-tests/docker-compose.yml up -d --build
+	$(GOTEST) -v ./integration-tests/...
+	docker-compose -f integration-tests/docker-compose.yml down
 lint:
 	$(GOLINT) ./...
 clean:

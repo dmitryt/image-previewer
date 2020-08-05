@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -50,7 +49,6 @@ func (c *lruCache) Init() error {
 		if err != nil {
 			return err
 		}
-		fmt.Println(path, info.IsDir(), strings.HasPrefix(filepath.Base(path), "."))
 		if !info.IsDir() && !strings.HasPrefix(filepath.Base(path), ".") {
 			c.Set(Key(filepath.Base(path)), path)
 		}
