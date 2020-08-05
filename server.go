@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +14,10 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
+
+type DummyResponse struct {
+	OK bool
+}
 
 var (
 	ErrInvalidURI          = errors.New("invalid URI. Expected format is: /<method>/<width>/<height>/<external url>")
@@ -60,10 +65,24 @@ func processResponse(fm *FileManager, w http.ResponseWriter) {
 	}
 }
 
+func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
+	dummyResponse := DummyResponse{true}
+
+	content, err := json.Marshal(dummyResponse)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write(content)
+}
+
 // Example: http://cut-service.com/fill/300/200/www.audubon.org/sites/default/files/a1_1902_16_barred-owl_sandra_rothenberg_kk.jpg
-func handler(w http.ResponseWriter, r *http.Request) {
+func mainHandler(w http.ResponseWriter, r *http.Request) {
 	urlParams := parseURL("/" + r.URL.Path[1:])
 	if !urlParams.valid {
+		w.WriteHeader(400)
 		fmt.Fprintf(w, "ERRRR %s!", ErrInvalidURI)
 		return
 	}
@@ -88,6 +107,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		defer resp.Body.Close()
 		err = fm.PrepareFile(io.LimitReader(resp.Body, int64(atoi(os.Getenv("MAX_FILE_SIZE"), 5*1024*1024))))
 		if err != nil {
+			w.WriteHeader(400)
 			fmt.Fprintf(w, "ERRRR %s!", err)
 			return
 		}
@@ -103,7 +123,7 @@ func init() {
 	if ok {
 		logLevel, _ = val.(zerolog.Level)
 	} else {
-		logLevel = zerolog.InfoLevel
+		logLevel = zerolog.DebugLevel
 	}
 	zerolog.SetGlobalLevel(logLevel)
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: zerolog.TimeFieldFormat})
@@ -120,9 +140,13 @@ func init() {
 }
 
 func main() {
-	http.HandleFunc("/", handler)
-	port := atoi(os.Getenv("PORT"), 8082)
-	if err := http.ListenAndServe(fmt.Sprintf("localhost:%d", port), nil); err != nil {
+	http.HandleFunc("/health_check", healthCheckHandler)
+	http.HandleFunc("/fill/", mainHandler)
+
+	address := fmt.Sprintf("0.0.0.0:%d", atoi(os.Getenv("PORT"), 8082))
+
+	log.Info().Msgf("Server starting at %s", address)
+	if err := http.ListenAndServe(address, nil); err != nil {
 		log.Fatal().Err(err).Msg("Startup failed")
 	}
 }
