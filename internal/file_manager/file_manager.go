@@ -1,4 +1,4 @@
-package file_manager
+package filemanager
 
 import (
 	"errors"
@@ -17,17 +17,19 @@ var (
 )
 
 type FileManager struct {
-	UrlParams utils.URLParams
+	URLParams utils.URLParams
 }
 
 func (fm FileManager) GetFileMimeType(f *os.File) (result string, err error) {
 	fileHeader := make([]byte, 512)
 	_, err = f.Read(fileHeader)
 	if err != nil {
+		log.Debug().Msgf("reading file header error %s", err)
 		return
 	}
 	_, err = f.Seek(0, 0)
 	if err != nil {
+		log.Debug().Msgf("seeking the file error %s", err)
 		return
 	}
 	//Get content type of file
@@ -61,8 +63,9 @@ func (fm FileManager) PrepareFile(r io.Reader, w io.Writer) (err error) {
 	if encoder == nil {
 		return ErrUnsupportedFileType
 	}
-	resized, err := utils.Resize(tmpFile, fm.UrlParams)
-
+	resized, err := utils.Resize(tmpFile, fm.URLParams)
+	log.Debug().Msgf("resized %s", err)
 	err = encoder.encode(w, resized.SubImage(resized.Rect))
+	log.Debug().Msgf("encoded %s", err)
 	return
 }

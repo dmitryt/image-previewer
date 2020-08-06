@@ -48,7 +48,9 @@ func TestList(t *testing.T) {
 		}
 		require.Equal(t, []int{50, 30, 10, 40, 60, 80, 70}, elems)
 	})
+}
 
+func TestListItemManager(t *testing.T) {
 	t.Run("should add first item correctly", func(t *testing.T) {
 		l := NewList()
 

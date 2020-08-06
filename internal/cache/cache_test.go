@@ -1,13 +1,14 @@
 package cache
 
 import (
-	"path/filepath"
 	"math/rand"
+	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
-	"os"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,30 +18,34 @@ func wrap(vs ...interface{}) []interface{} {
 
 var cacheDir = ".cache"
 
-func checkSetItem(t *testing.T, c Cache, key Key, value interface{}, expected bool) {
-	wasInCache, err := c.Set(key, value)
+func init() {
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+}
+
+func checkSetItem(t *testing.T, c Cache, key Key, expected bool) {
+	checkFileInDir(t, c, key, expected)
+	wasInCache, err := c.Set(key, string(key))
 	require.NoError(t, err, err)
 	if expected {
 		require.True(t, wasInCache)
 	} else {
 		require.False(t, wasInCache)
 	}
-	checkFileInDir(t, c, key, expected)
 }
 
-func checkGetItem(t *testing.T, c Cache, key Key, expected interface{}) {
-	if expected != nil {
-		require.Equal(t, []interface{}{expected, true}, wrap(c.Get(key)))
+func checkGetItem(t *testing.T, c Cache, key Key, expected bool) {
+	if expected {
+		require.Equal(t, []interface{}{string(key), true}, wrap(c.Get(key)))
 	} else {
 		require.Equal(t, []interface{}{nil, false}, wrap(c.Get(key)))
 	}
-	checkFileInDir(t, c, key, expected != nil)
+	checkFileInDir(t, c, key, expected)
 }
 
 func checkFileInDir(t *testing.T, c Cache, key Key, expected bool) {
 	_, err := os.Stat(filepath.Join(c.GetDir(), string(key)))
 	if expected {
-		require.True(t, os.IsExist(err))
+		require.NoError(t, err)
 	} else {
 		require.True(t, os.IsNotExist(err))
 	}
@@ -51,64 +56,64 @@ func TestCache(t *testing.T) {
 		c, err := NewCache(10, cacheDir)
 		require.NoError(t, err, err)
 
-		checkGetItem(t, c, "aaa", nil)
-		checkGetItem(t, c, "bbb", nil)
+		checkGetItem(t, c, "aaa", false)
+		checkGetItem(t, c, "bbb", false)
 		c.Clear()
 	})
-
 	t.Run("simple", func(t *testing.T) {
 		c, err := NewCache(5, cacheDir)
 		require.NoError(t, err, err)
 
-		checkSetItem(t, c, "aaa", "aaav", false)
-		checkSetItem(t, c, "bbb", "bbbv", false)
+		checkSetItem(t, c, "aaa", false)
+		checkSetItem(t, c, "bbb", false)
 
-		checkGetItem(t, c, "aaa", "aaav")
-		checkGetItem(t, c, "bbb", "bbbv")
+		checkGetItem(t, c, "aaa", true)
+		checkGetItem(t, c, "bbb", true)
 
-		checkSetItem(t, c, "aaa", "aaav", true)
+		checkSetItem(t, c, "aaa", true)
 
-		checkGetItem(t, c, "aaa", "aaav")
-		checkGetItem(t, c, "ccc", nil)
+		checkGetItem(t, c, "aaa", true)
+		checkGetItem(t, c, "ccc", false)
 
-		// c.Clear()
+		c.Clear()
 	})
+	t.Run("purge logic", func(t *testing.T) {
+		c, err := NewCache(10, cacheDir)
+		require.NoError(t, err, err)
 
-	// t.Run("purge logic", func(t *testing.T) {
-	// 	c, err := NewCache(10, cacheDir)
-	// 	require.NoError(t, err, err)
+		checkSetItem(t, c, "aaa", false)
+		checkSetItem(t, c, "bbb", false)
+		checkSetItem(t, c, "ccc", false)
 
-	// 	checkSetItem(t, c, "aaa", "aaav", false)
-	// 	checkSetItem(t, c, "bbb", "bbbv", false)
-	// 	checkSetItem(t, c, "ccc", "cccv", false)
+		// Check values in the cache
+		checkGetItem(t, c, "aaa", true)
+		checkGetItem(t, c, "bbb", true)
+		checkGetItem(t, c, "ccc", true)
 
-	// 	// Check values in the cache
-	// 	checkGetItem(t, c, "aaa", "aaav")
-	// 	checkGetItem(t, c, "bbb", "bbbv")
-	// 	checkGetItem(t, c, "ccc", "cccv")
+		c.Clear()
 
-	// 	c.Clear()
+		// Check values in the cache
+		checkGetItem(t, c, "aaa", false)
+		checkGetItem(t, c, "bbb", false)
+		checkGetItem(t, c, "ccc", false)
+	})
+}
 
-	// 	// Check values in the cache
-	// 	checkGetItem(t, c, "aaa", nil)
-	// 	checkGetItem(t, c, "bbb", nil)
-	// 	checkGetItem(t, c, "ccc", nil)
-	// })
+func TestCacheCapacity(t *testing.T) {
+	t.Run("check cache capacity", func(t *testing.T) {
+		c, err := NewCache(4, cacheDir)
+		require.NoError(t, err, err)
 
-	// t.Run("check cache capacity", func(t *testing.T) {
-	// 	c, err := NewCache(4, cacheDir)
-	// 	require.NoError(t, err, err)
+		checkSetItem(t, c, "aaa", false)
+		checkSetItem(t, c, "bbb", false)
+		checkSetItem(t, c, "ccc", false)
+		checkSetItem(t, c, "ddd", false)
+		checkSetItem(t, c, "eee", false)
 
-	// 	checkSetItem(t, c, "aaa", "aaav", false)
-	// 	checkSetItem(t, c, "bbb", "bbbv", false)
-	// 	checkSetItem(t, c, "ccc", "cccv", false)
-	// 	checkSetItem(t, c, "ddd", "dddv", false)
-	// 	checkSetItem(t, c, "eee", "eeev", false)
-
-	// 	// Item should be removed from the cache
-	// 	checkGetItem(t, c, "aaa", nil)
-	// 	c.Clear()
-	// })
+		// Item should be removed from the cache
+		checkGetItem(t, c, "aaa", false)
+		c.Clear()
+	})
 }
 
 func TestCacheMultithreading(t *testing.T) {
@@ -120,7 +125,7 @@ func TestCacheMultithreading(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for i := 0; i < 1_000_000; i++ {
-			c.Set(Key(strconv.Itoa(i)), i)
+			_, _ = c.Set(Key(strconv.Itoa(i)), i)
 		}
 	}()
 
