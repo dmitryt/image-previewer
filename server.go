@@ -14,15 +14,16 @@ import (
 )
 
 func init() {
-	// var val interface{}
-	// var logLevel zerolog.Level
-	// val, ok := os.LookupEnv("LOG_LEVEL")
-	// if ok {
-	// 	logLevel, _ = val.(zerolog.Level)
-	// } else {
-	// 	logLevel = zerolog.InfoLevel
-	// }
-	// zerolog.SetGlobalLevel(logLevel)
+	var val interface{}
+	var logLevel zerolog.Level
+	val, ok := os.LookupEnv("LOG_LEVEL")
+	if ok {
+		logLevel, _ = val.(zerolog.Level)
+	} else {
+		logLevel = zerolog.InfoLevel
+	}
+	zerolog.SetGlobalLevel(logLevel)
+	fmt.Println("LLLL", zerolog.GlobalLevel())
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: zerolog.TimeFieldFormat})
 }
 
