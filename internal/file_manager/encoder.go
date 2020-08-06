@@ -1,4 +1,4 @@
-package main
+package file_manager
 
 import (
 	"image"

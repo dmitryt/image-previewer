@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"image"
@@ -11,19 +11,19 @@ import (
 )
 
 type URLParams struct {
-	method      string
-	height      int
-	width       int
-	filename    string
-	externalURL string
-	valid       bool
+	Method      string
+	Height      int
+	Width       int
+	Filename    string
+	ExternalURL string
+	Valid       bool
 }
 
 var urlRe = regexp.MustCompile(`/fill/(\d+)/(\d+)/(.*)?`)
 
-func parseURL(url string) URLParams {
+func ParseURL(url string) URLParams {
 	if !urlRe.MatchString(url) {
-		return URLParams{valid: false}
+		return URLParams{Valid: false}
 	}
 	matched := urlRe.FindAllStringSubmatch(url, -1)[0]
 	// Ignore errors, non-numbers will be filtered out by regexp
@@ -33,25 +33,25 @@ func parseURL(url string) URLParams {
 	paths := strings.Split(externalURL, "/")
 
 	return URLParams{
-		method:      matched[0],
-		width:       width,
-		height:      height,
-		filename:    paths[len(paths)-1],
-		externalURL: externalURL,
-		valid:       true,
+		Method:      "fill",
+		Width:       width,
+		Height:      height,
+		Filename:    paths[len(paths)-1],
+		ExternalURL: externalURL,
+		Valid:       true,
 	}
 }
 
-func resize(r io.Reader, urlParams URLParams) (result *image.NRGBA, err error) {
+func Resize(r io.Reader, urlParams URLParams) (result *image.NRGBA, err error) {
 	img, _, err := image.Decode(r)
 	if err != nil {
 		return
 	}
-	result = imaging.Fill(img, urlParams.width, urlParams.height, imaging.Center, imaging.Lanczos)
+	result = imaging.Fill(img, urlParams.Width, urlParams.Height, imaging.Center, imaging.Lanczos)
 	return
 }
 
-func atoi(str string, defaultValue int) int {
+func Atoi(str string, defaultValue int) int {
 	val, err := strconv.Atoi(str)
 	if err != nil {
 		val = defaultValue

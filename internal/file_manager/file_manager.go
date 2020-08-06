@@ -1,36 +1,23 @@
-package main
+package file_manager
 
 import (
-	"crypto/sha512"
-	"fmt"
+	"errors"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
-	"path"
+
+	utils "github.com/dmitryt/image-previewer/internal/utils"
 
 	"github.com/rs/zerolog/log"
 )
 
+var (
+	ErrUnsupportedFileType = errors.New("file type is not supported. Supported file types: jpeg, png, gif")
+)
+
 type FileManager struct {
-	cacheDir  string
-	urlParams URLParams
-}
-
-func (fm FileManager) GetCacheKey() string {
-	width := fm.urlParams.width
-	height := fm.urlParams.height
-	h := sha512.New()
-	_, _ = io.WriteString(h, fmt.Sprintf("%s/%dx%d", fm.urlParams.externalURL, width, height))
-	return string([]rune(fmt.Sprintf("%x", h.Sum(nil)))[0:64])
-}
-
-func (fm FileManager) GetFilePath() string {
-	return path.Join(fm.cacheDir, fm.GetCacheKey())
-}
-
-func (fm FileManager) GetFile() (*os.File, error) {
-	return os.Open(fm.GetFilePath())
+	UrlParams utils.URLParams
 }
 
 func (fm FileManager) GetFileMimeType(f *os.File) (result string, err error) {
@@ -48,7 +35,7 @@ func (fm FileManager) GetFileMimeType(f *os.File) (result string, err error) {
 	return
 }
 
-func (fm FileManager) PrepareFile(r io.Reader) (err error) {
+func (fm FileManager) PrepareFile(r io.Reader, w io.Writer) (err error) {
 	// Init Tmp File
 	tmpFile, err := ioutil.TempFile("", "tmp")
 	if err != nil {
@@ -74,15 +61,8 @@ func (fm FileManager) PrepareFile(r io.Reader) (err error) {
 	if encoder == nil {
 		return ErrUnsupportedFileType
 	}
-	resized, err := resize(tmpFile, fm.urlParams)
+	resized, err := utils.Resize(tmpFile, fm.UrlParams)
 
-	// Create file
-	f, err := os.Create(fm.GetFilePath())
-	if err != nil {
-		return
-	}
-	log.Debug().Msgf("created file %s", fm.GetFilePath())
-	defer f.Close()
-	err = encoder.encode(f, resized.SubImage(resized.Rect))
+	err = encoder.encode(w, resized.SubImage(resized.Rect))
 	return
 }
