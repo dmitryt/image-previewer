@@ -66,7 +66,7 @@ func (c *lruCache) Init() error {
 			return err
 		}
 		if !info.IsDir() && !strings.HasPrefix(filepath.Base(path), ".") {
-			_, err = c.Set(Key(filepath.Base(path)), string(filepath.Base(path)))
+			_, err = c.Set(Key(filepath.Base(path)), filepath.Base(path))
 			if err != nil {
 				return err
 			}
@@ -144,11 +144,12 @@ func (c *lruCache) Set(key Key, value interface{}) (found bool, err error) {
 			return found, ErrIncorrectFilePath
 		}
 		_, err := os.Stat(filepath.Join(c.dir, fpath))
-		if os.IsNotExist(err) {
-			err = c.AddFile(filepath.Join(c.dir, fpath))
-			if err != nil {
-				return found, err
-			}
+		if err != nil && !os.IsNotExist(err) {
+			return found, err
+		}
+		err = c.AddFile(filepath.Join(c.dir, fpath))
+		if err != nil {
+			return found, err
 		}
 	}
 	c.items[key] = c.queue.PushFront(cacheItem{key: key, value: value})
