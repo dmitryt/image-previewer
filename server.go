@@ -23,7 +23,6 @@ func init() {
 		logLevel = zerolog.InfoLevel
 	}
 	zerolog.SetGlobalLevel(logLevel)
-	fmt.Println("LLLL", zerolog.GlobalLevel())
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: zerolog.TimeFieldFormat})
 }
 

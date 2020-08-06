@@ -79,7 +79,7 @@ func (api *API) processRequest(fm *fmPkg.FileManager, header http.Header) (statu
 	if err != nil {
 		log.Error().Msgf("%s %s", ErrCacheFile, err)
 	}
-	f, err := cache.GetFile(fm.URLParams)
+	f, err := cache.GetFile(fm.URLParams, os.O_APPEND|os.O_WRONLY)
 	if err != nil {
 		log.Error().Msgf("%s %s", ErrCacheFile, err)
 		return 400, fmt.Sprintf("%s", ErrCacheFile)
@@ -131,7 +131,7 @@ func (api *API) ResizeHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "ERROR %s!", errStr)
 		return
 	}
-	f, err := cache.GetFile2(fm.URLParams)
+	f, err := cache.GetFile(fm.URLParams, os.O_RDONLY)
 	if err != nil {
 		log.Error().Msgf("%s %s", ErrCacheFile, err)
 		w.WriteHeader(400)

@@ -26,8 +26,7 @@ type Cache interface {
 	Get(key Key) (interface{}, bool)
 	GetKey(utils.URLParams) Key
 	GetDir() string
-	GetFile(utils.URLParams) (*os.File, error)
-	GetFile2(utils.URLParams) (*os.File, error)
+	GetFile(utils.URLParams, int) (*os.File, error)
 	GetFilePath(utils.URLParams) string
 	Clear()
 }
@@ -79,16 +78,10 @@ func (c *lruCache) GetFilePath(up utils.URLParams) string {
 	return filepath.Join(c.GetDir(), string(c.GetKey(up)))
 }
 
-func (c *lruCache) GetFile(up utils.URLParams) (*os.File, error) {
+func (c *lruCache) GetFile(up utils.URLParams, flag int) (*os.File, error) {
 	fpath := c.GetFilePath(up)
 	log.Debug().Msgf("Getting cache file %s", fpath)
-	return os.OpenFile(fpath, os.O_APPEND|os.O_WRONLY, os.ModeAppend)
-}
-
-func (c *lruCache) GetFile2(up utils.URLParams) (*os.File, error) {
-	fpath := c.GetFilePath(up)
-	log.Debug().Msgf("Getting cache file %s", fpath)
-	return os.Open(fpath)
+	return os.OpenFile(fpath, flag, os.ModeAppend)
 }
 
 func (c *lruCache) GetKey(up utils.URLParams) Key {
@@ -132,6 +125,16 @@ func (c *lruCache) RemoveFile(fpath string) (err error) {
 	return nil
 }
 
+func (c *lruCache) processAddFile(fpath string) error {
+	if _, err := os.Stat(filepath.Join(c.dir, fpath)); os.IsNotExist(err) {
+		err = c.AddFile(filepath.Join(c.dir, fpath))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (c *lruCache) Set(key Key, value interface{}) (found bool, err error) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
@@ -143,11 +146,7 @@ func (c *lruCache) Set(key Key, value interface{}) (found bool, err error) {
 		if !ok {
 			return found, ErrIncorrectFilePath
 		}
-		_, err := os.Stat(filepath.Join(c.dir, fpath))
-		if err != nil && !os.IsNotExist(err) {
-			return found, err
-		}
-		err = c.AddFile(filepath.Join(c.dir, fpath))
+		err = c.processAddFile(fpath)
 		if err != nil {
 			return found, err
 		}

@@ -16,6 +16,21 @@ import (
 
 var cacheDir = ".cache-test"
 
+func setup() {
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+}
+
+func TestMain(m *testing.M) {
+	setup()
+	code := m.Run()
+	teardown()
+	os.Exit(code)
+}
+
+func teardown() {
+	os.RemoveAll(cacheDir)
+}
+
 func prepareHandlers(server *httptest.Server) *http.ServeMux {
 	api := API{Client: server.Client()}
 	r := http.NewServeMux()
@@ -30,10 +45,6 @@ func checkFileInDir(t *testing.T, fileName string, expected bool) {
 	} else {
 		require.True(t, os.IsNotExist(err))
 	}
-}
-
-func init() {
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 }
 
 func makeRequest(t *testing.T, host, url string) *http.Response {
@@ -79,6 +90,4 @@ func TestResizeCacheHandler(t *testing.T) {
 	url := fmt.Sprintf(urlTemplate, srv.URL, baseHeight, externalURL)
 	cacheKey := GetCacheKey(url)
 	checkFileInDir(t, cacheKey, false)
-
-	os.RemoveAll(cacheDir)
 }
