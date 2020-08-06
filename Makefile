@@ -9,7 +9,7 @@ BINARY_NAME=image-previewer
 
 all: clean test lint build
 test:
-	$(GOTEST) -v -race -count 100 `go list ./... | grep -v integration-tests`
+	CACHE_DIR=.cache-test $(GOTEST) -v `go list ./... | grep -v integration-tests`
 integration-test:
 	docker-compose -f integration-tests/docker-compose.yml up -d --build
 	$(GOTEST) -v ./integration-tests/...
@@ -20,5 +20,5 @@ clean:
 	$(GOCLEAN)
 	rm -f $(BINARY_NAME)
 run:
-	$(GOBUILD) -o $(BINARY_NAME) -v ./...
+	$(GOBUILD) -o $(BINARY_NAME)
 	./$(BINARY_NAME)
