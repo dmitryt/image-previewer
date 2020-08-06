@@ -10,17 +10,20 @@ Web service for resizing images. Supported extensions: jpg, png, gif.
 1. As a separate service
 
 ```console
-docker run greml1n/image-previewer
+docker run -p 8083:8082  greml1n/image-previewer
 ```
 2. Run locally
 
 ```console
 make run
 ```
-3. Run integration tests
+
+## Example
+
+Launch the service and open the following URL in browser
 
 ```console
-make integration-test
+http://localhost:8082/fill/300/200/www.audubon.org/sites/default/files/a1_1902_16_barred-owl_sandra_rothenberg_kk.jpg
 ```
 
 ## Environment Variables
@@ -31,9 +34,6 @@ PORT=3000
 
 # defaults to "5242880" - 5mb
 MAX_FILE_SIZE=10485760
-
-# defaults to "info"
-LOG_LEVEL=debug
 
 # defaults to ".cache"
 CACHE_DIR=/path/to-dir
