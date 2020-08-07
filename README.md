@@ -1,6 +1,6 @@
 # image-previewer 🚀
-![Build Status](https://github.com/dmitryt/image-previewer/workflows/Lint,%20Test%20and%20Deploy/badge.svg)
-![PR Status](https://github.com/dmitryt/image-previewer/workflows/Lint%20and%20Test/badge.svg)
+![Test](https://github.com/dmitryt/image-previewer/workflows/Test/badge.svg?branch=master)
+![Lint](https://github.com/dmitryt/image-previewer/workflows/Lint/badge.svg?branch=master)
 ![Go Report Card](https://goreportcard.com/badge/github.com/dmitryt/image-previewer)
 
 Web service for resizing images. Supported extensions: jpg, png, gif.
