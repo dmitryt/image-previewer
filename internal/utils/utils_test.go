@@ -16,23 +16,16 @@ func TestParseURL(t *testing.T) {
 			Width:       300,
 			Filename:    "a1_1902_16_barred-owl_sandra_rothenberg_kk.jpg",
 			ExternalURL: "www.audubon.org/sites/default/files/a1_1902_16_barred-owl_sandra_rothenberg_kk.jpg",
-			Valid:       true,
+			Error:       nil,
 		}, result)
 	})
 
 	t.Run("should mark URL as invalid, if URL is not matched by pattert", func(t *testing.T) {
 		require.Equal(t, URLParams{
-			Valid: false,
+			Error: ErrURLPatternMatching,
 		}, ParseURL("/fill/width/200/www.audubon.org/sites/default/files/a1_1902_16_barred-owl_sandra_rothenberg_kk.jpg"))
 		require.Equal(t, URLParams{
-			Valid: false,
+			Error: ErrURLPatternMatching,
 		}, ParseURL("/something/200/300/www.audubon.org/sites/default/files/a1_1902_16_barred-owl_sandra_rothenberg_kk.jpg"))
-	})
-}
-
-func TestAtoi(t *testing.T) {
-	t.Run("should convert string to int correctly", func(t *testing.T) {
-		require.Equal(t, 10, Atoi("10", 5))
-		require.Equal(t, 5, Atoi("string", 5))
 	})
 }

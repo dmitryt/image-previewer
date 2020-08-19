@@ -1,4 +1,4 @@
-package filemanager
+package resizer
 
 import (
 	"image"
@@ -9,22 +9,24 @@ import (
 )
 
 type Encoder interface {
-	encode(io.Writer, image.Image) error
+	Encode(io.Writer, image.Image) error
 }
 
-type JpegEncoder struct{}
-type PngEncoder struct{}
-type GifEncoder struct{}
+type (
+	JpegEncoder struct{}
+	PngEncoder  struct{}
+	GifEncoder  struct{}
+)
 
-func (r JpegEncoder) encode(w io.Writer, img image.Image) error {
+func (r JpegEncoder) Encode(w io.Writer, img image.Image) error {
 	return jpeg.Encode(w, img, nil)
 }
 
-func (r PngEncoder) encode(w io.Writer, img image.Image) error {
+func (r PngEncoder) Encode(w io.Writer, img image.Image) error {
 	return png.Encode(w, img)
 }
 
-func (r GifEncoder) encode(w io.Writer, img image.Image) error {
+func (r GifEncoder) Encode(w io.Writer, img image.Image) error {
 	return gif.Encode(w, img, nil)
 }
 

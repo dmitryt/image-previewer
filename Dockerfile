@@ -14,7 +14,7 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN go build -o main .
+RUN mkdir -p main && go build -o main ./...
 
 # Build a small image
 FROM alpine:latest
@@ -22,9 +22,11 @@ FROM alpine:latest
 ENV PORT 8082
 ENV CACHE_DIR .cache
 ENV CACHE_SIZE 10
+ENV LOG_LEVEL info
+ENV MAX_FILE_SIZE 5242880
 
-COPY --from=builder /build/main /
+COPY --from=builder /build/main/previewer /
 EXPOSE 8082
 
 # Command to run
-ENTRYPOINT ["/main"]
+ENTRYPOINT ["/previewer"]

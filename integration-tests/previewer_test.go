@@ -18,9 +18,7 @@ import (
 
 var comparator = diff.NewBinary()
 
-var (
-	resizedImgsFolder = filepath.Join("testdata", "resized")
-)
+var resizedImgsFolder = filepath.Join("testdata", "resized")
 
 func loadImgFromHTTP(url string) (result image.Image, err error) {
 	resp, err := http.Get("http://localhost:8082" + url)
@@ -29,6 +27,7 @@ func loadImgFromHTTP(url string) (result image.Image, err error) {
 	}
 	defer resp.Body.Close()
 	result, _, err = image.Decode(resp.Body)
+
 	return
 }
 

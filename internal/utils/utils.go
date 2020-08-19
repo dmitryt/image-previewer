@@ -1,13 +1,17 @@
 package utils
 
 import (
+	"errors"
 	"image"
 	"io"
+	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/disintegration/imaging"
+	"github.com/rs/zerolog/log"
 )
 
 type URLParams struct {
@@ -16,21 +20,27 @@ type URLParams struct {
 	Width       int
 	Filename    string
 	ExternalURL string
-	Valid       bool
+	Error       error
 }
+
+var ErrURLPatternMatching = errors.New("URL doesn't match the pattern")
 
 var urlRe = regexp.MustCompile(`/fill/(\d+)/(\d+)/(.*)?`)
 
 func ParseURL(url string) URLParams {
 	if !urlRe.MatchString(url) {
-		return URLParams{Valid: false}
+		return URLParams{Error: ErrURLPatternMatching}
 	}
 	matched := urlRe.FindAllStringSubmatch(url, -1)[0]
-	// Ignore errors, non-numbers will be filtered out by regexp
-	width, _ := strconv.Atoi(matched[1])
-	height, _ := strconv.Atoi(matched[2])
+	width, errWidth := strconv.Atoi(matched[1])
+	height, errHeight := strconv.Atoi(matched[2])
 	externalURL := matched[3]
 	paths := strings.Split(externalURL, "/")
+
+	err := errWidth
+	if err == nil {
+		err = errHeight
+	}
 
 	return URLParams{
 		Method:      "fill",
@@ -38,7 +48,7 @@ func ParseURL(url string) URLParams {
 		Height:      height,
 		Filename:    paths[len(paths)-1],
 		ExternalURL: externalURL,
-		Valid:       true,
+		Error:       err,
 	}
 }
 
@@ -48,13 +58,26 @@ func Resize(r io.Reader, urlParams URLParams) (result *image.NRGBA, err error) {
 		return
 	}
 	result = imaging.Fill(img, urlParams.Width, urlParams.Height, imaging.Center, imaging.Lanczos)
+
 	return
 }
 
-func Atoi(str string, defaultValue int) int {
-	val, err := strconv.Atoi(str)
+func GetFileMimeType(f *os.File) (result string, err error) {
+	fileHeader := make([]byte, 512)
+	_, err = f.Read(fileHeader)
 	if err != nil {
-		val = defaultValue
+		log.Debug().Msgf("reading file header error %s", err)
+
+		return
 	}
-	return val
+	_, err = f.Seek(0, 0)
+	if err != nil {
+		log.Debug().Msgf("seeking the file error %s", err)
+
+		return
+	}
+	// Get content type of file
+	result = http.DetectContentType(fileHeader)
+
+	return
 }
