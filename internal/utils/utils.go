@@ -2,15 +2,12 @@ package utils
 
 import (
 	"errors"
-	"image"
-	"io"
 	"net/http"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/disintegration/imaging"
 	"github.com/rs/zerolog/log"
 )
 
@@ -50,16 +47,6 @@ func ParseURL(url string) URLParams {
 		ExternalURL: externalURL,
 		Error:       err,
 	}
-}
-
-func Resize(r io.Reader, urlParams URLParams) (result *image.NRGBA, err error) {
-	img, _, err := image.Decode(r)
-	if err != nil {
-		return
-	}
-	result = imaging.Fill(img, urlParams.Width, urlParams.Height, imaging.Center, imaging.Lanczos)
-
-	return
 }
 
 func GetFileMimeType(f *os.File) (result string, err error) {
