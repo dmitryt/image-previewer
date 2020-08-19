@@ -1,11 +1,11 @@
 package previewer
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
-	"errors"
 
 	"github.com/dmitryt/image-previewer/internal/fetcher"
 	"github.com/dmitryt/image-previewer/internal/resizer"
@@ -13,9 +13,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-var (
-	ErrResize = errors.New("resize problem occurred")
-)
+var ErrResize = errors.New("resize problem occurred")
 
 type Transport struct {
 	fetcher fetcher.Fetcher

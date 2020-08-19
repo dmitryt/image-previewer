@@ -1,6 +1,7 @@
 package previewer
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -32,8 +33,8 @@ func teardown() {
 	os.RemoveAll(cacheDir)
 }
 
-func prepareHandlers(t *testing.T, cfg *config.Config, server *httptest.Server) (*Previewer, *http.ServeMux) {
-	app, err := New(cfg, server.Client())
+func prepareHandlers(t *testing.T, cfg *config.Config, client *http.Client) (*Previewer, *http.ServeMux) {
+	app, err := New(cfg, client)
 	require.NoError(t, err)
 	r := http.NewServeMux()
 	r.HandleFunc("/fill/", app.ResizeHandler)
@@ -50,8 +51,12 @@ func checkFileInDir(t *testing.T, fileName string, expected bool) {
 	}
 }
 
-func makeRequest(t *testing.T, host, url string) *http.Response {
-	res, err := http.Get(host + url)
+func makeRequest(t *testing.T, client *http.Client, host, url string) *http.Response {
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, host+url, nil)
+	if err != nil {
+		t.Fatal(t, err)
+	}
+	res, err := client.Do(req)
 	if err != nil {
 		t.Fatal(t, err)
 	}
@@ -69,7 +74,8 @@ func TestResizeCacheHandler(t *testing.T) {
 
 	externalURL := fmt.Sprintf("%s/some/file/path.jpg", strings.Replace(externalServer.URL, "http://", "", -1))
 
-	app, mux := prepareHandlers(t, cfg, externalServer)
+	client := externalServer.Client()
+	app, mux := prepareHandlers(t, cfg, client)
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
@@ -81,7 +87,7 @@ func TestResizeCacheHandler(t *testing.T) {
 	for i := 0; i <= cacheSize; i++ {
 		url := fmt.Sprintf(urlTemplate, baseHeight+i, externalURL)
 		up := utils.URLParams{ExternalURL: externalURL, Width: 100, Height: baseHeight + i}
-		res := makeRequest(t, srv.URL, url)
+		res := makeRequest(t, client, srv.URL, url)
 		defer res.Body.Close()
 
 		cacheKey := app.resizer.GetCacheKey(up)

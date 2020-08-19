@@ -1,9 +1,9 @@
 package fetcher
 
 import (
-	"fmt"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
