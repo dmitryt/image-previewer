@@ -1,4 +1,4 @@
-package previewer
+package app
 
 import (
 	"context"
@@ -33,7 +33,7 @@ func teardown() {
 	os.RemoveAll(cacheDir)
 }
 
-func prepareHandlers(t *testing.T, cfg *config.Config, client *http.Client) (*Previewer, *http.ServeMux) {
+func prepareHandlers(t *testing.T, cfg *config.Config, client *http.Client) (*App, *http.ServeMux) {
 	app, err := New(cfg, client)
 	require.NoError(t, err)
 	r := http.NewServeMux()

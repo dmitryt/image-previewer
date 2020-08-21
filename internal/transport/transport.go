@@ -1,4 +1,4 @@
-package previewer
+package transport
 
 import (
 	"errors"
@@ -20,7 +20,7 @@ type Transport struct {
 	resizer *resizer.Resizer
 }
 
-func NewTransport(f fetcher.Fetcher, r *resizer.Resizer) *Transport {
+func New(f fetcher.Fetcher, r *resizer.Resizer) *Transport {
 	return &Transport{
 		fetcher: f,
 		resizer: r,

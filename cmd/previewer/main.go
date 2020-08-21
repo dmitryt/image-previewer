@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/dmitryt/image-previewer/internal/app"
 	"github.com/dmitryt/image-previewer/internal/config"
 	"github.com/dmitryt/image-previewer/internal/logger"
-	"github.com/dmitryt/image-previewer/internal/previewer"
 	"github.com/rs/zerolog/log"
 )
 
@@ -29,7 +29,7 @@ func main() {
 	}
 	logger.Init(cfg)
 	log.Debug().Msgf("Config Init %+v", cfg)
-	app, err := previewer.New(cfg, http.DefaultClient)
+	app, err := app.New(cfg, http.DefaultClient)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("%s", ErrAppFatal)
 	}

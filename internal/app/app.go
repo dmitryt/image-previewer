@@ -1,4 +1,4 @@
-package previewer
+package app
 
 import (
 	"encoding/json"
@@ -9,6 +9,7 @@ import (
 	"github.com/dmitryt/image-previewer/internal/config"
 	"github.com/dmitryt/image-previewer/internal/fetcher"
 	"github.com/dmitryt/image-previewer/internal/resizer"
+	"github.com/dmitryt/image-previewer/internal/transport"
 	"github.com/dmitryt/image-previewer/internal/utils"
 	"github.com/rs/zerolog/log"
 )
@@ -20,28 +21,28 @@ var (
 	ErrImageCopyFromCache = errors.New("error during copying the image from cache")
 )
 
-type Previewer struct {
+type App struct {
 	config    *config.Config
 	resizer   *resizer.Resizer
-	transport *Transport
+	transport *transport.Transport
 }
 
 type DummyResponse struct {
 	OK bool
 }
 
-func New(config *config.Config, client *http.Client) (*Previewer, error) {
+func New(config *config.Config, client *http.Client) (*App, error) {
 	rsz, err := resizer.New(config)
-	transport := NewTransport(fetcher.NewHTTPFetcher(client, config), rsz)
+	transport := transport.New(fetcher.NewHTTPFetcher(client, config), rsz)
 
-	return &Previewer{
+	return &App{
 		config:    config,
 		resizer:   rsz,
 		transport: transport,
 	}, err
 }
 
-func (p *Previewer) HealthCheckHandler(w http.ResponseWriter, r *http.Request) {
+func (p *App) HealthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	dummyResponse := DummyResponse{true}
 
 	content, err := json.Marshal(dummyResponse)
@@ -55,7 +56,7 @@ func (p *Previewer) HealthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(content)
 }
 
-func (p *Previewer) ResizeHandler(w http.ResponseWriter, r *http.Request) {
+func (p *App) ResizeHandler(w http.ResponseWriter, r *http.Request) {
 	urlParams := utils.ParseURL("/" + r.URL.Path[1:])
 	log.Debug().Msgf("url params %+v", urlParams)
 	if urlParams.Error != nil {
@@ -84,7 +85,7 @@ func (p *Previewer) ResizeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (p *Previewer) Run(addr string) error {
+func (p *App) Run(addr string) error {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/health-check", p.HealthCheckHandler)
