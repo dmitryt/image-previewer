@@ -1,15 +1,17 @@
-package api
+package app
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/dmitryt/image-previewer/internal/config"
+	"github.com/dmitryt/image-previewer/internal/utils"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
@@ -31,11 +33,13 @@ func teardown() {
 	os.RemoveAll(cacheDir)
 }
 
-func prepareHandlers(server *httptest.Server) *http.ServeMux {
-	api := API{Client: server.Client()}
+func prepareHandlers(t *testing.T, cfg *config.Config, client *http.Client) (*App, *http.ServeMux) {
+	app, err := New(cfg, client)
+	require.NoError(t, err)
 	r := http.NewServeMux()
-	r.HandleFunc("/fill/", api.ResizeHandler)
-	return r
+	r.HandleFunc("/fill/", app.ResizeHandler)
+
+	return app, r
 }
 
 func checkFileInDir(t *testing.T, fileName string, expected bool) {
@@ -47,47 +51,54 @@ func checkFileInDir(t *testing.T, fileName string, expected bool) {
 	}
 }
 
-func makeRequest(t *testing.T, host, url string) *http.Response {
-	res, err := http.Get(host + url)
+func makeRequest(t *testing.T, client *http.Client, host, url string) *http.Response {
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, host+url, nil)
 	if err != nil {
 		t.Fatal(t, err)
 	}
+	res, err := client.Do(req)
+	if err != nil {
+		t.Fatal(t, err)
+	}
+
 	return res
 }
 
 func TestResizeCacheHandler(t *testing.T) {
+	cfg := config.GetDefaultConfig()
+	cfg.CacheDir = cacheDir
 	externalServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "testdata/sample.jpg")
 	}))
 	defer externalServer.Close()
 
-	var externalURL = fmt.Sprintf("%s/some/file/path.jpg", strings.Replace(externalServer.URL, "http://", "", -1))
+	externalURL := fmt.Sprintf("%s/some/file/path.jpg", strings.Replace(externalServer.URL, "http://", "", -1))
 
-	srv := httptest.NewServer(prepareHandlers(externalServer))
+	client := externalServer.Client()
+	app, mux := prepareHandlers(t, cfg, client)
+	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
-	cacheSize, _ := strconv.Atoi(os.Getenv("CACHE_SIZE"))
-	if cacheSize == 0 {
-		cacheSize = 10
-	}
+	cacheSize := cfg.CacheSize
 
 	baseHeight := 200
 	urlTemplate := "/fill/100/%d/%s"
 
 	for i := 0; i <= cacheSize; i++ {
 		url := fmt.Sprintf(urlTemplate, baseHeight+i, externalURL)
-		res := makeRequest(t, srv.URL, url)
+		up := utils.URLParams{ExternalURL: externalURL, Width: 100, Height: baseHeight + i}
+		res := makeRequest(t, client, srv.URL, url)
 		defer res.Body.Close()
 
-		cacheKey := GetCacheKey(url)
+		cacheKey := app.resizer.GetCacheKey(up)
 		require.Equal(t, http.StatusOK, res.StatusCode, "incorrect status code")
 		require.Equal(t, []string{"image/jpeg"}, res.Header["Content-Type"], "incorrect Content-Type")
 
-		checkFileInDir(t, cacheKey, true)
+		checkFileInDir(t, string(cacheKey), true)
 	}
 
 	// Check first item. File shouldn't exist in cache folder
-	url := fmt.Sprintf(urlTemplate, srv.URL, baseHeight, externalURL)
-	cacheKey := GetCacheKey(url)
-	checkFileInDir(t, cacheKey, false)
+	up := utils.URLParams{ExternalURL: externalURL, Width: 100, Height: baseHeight}
+	cacheKey := app.resizer.GetCacheKey(up)
+	checkFileInDir(t, string(cacheKey), false)
 }

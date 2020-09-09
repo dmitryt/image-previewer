@@ -1,7 +1,8 @@
 package cache
 
 import (
-	"math/rand"
+	"crypto/rand"
+	"math/big"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -53,7 +54,7 @@ func checkFileInDir(t *testing.T, c Cache, key Key, expected bool) {
 
 func TestCache(t *testing.T) {
 	t.Run("empty cache", func(t *testing.T) {
-		c, err := NewCache(10, cacheDir)
+		c, err := New(10, cacheDir)
 		require.NoError(t, err, err)
 
 		checkGetItem(t, c, "aaa", false)
@@ -61,7 +62,7 @@ func TestCache(t *testing.T) {
 		c.Clear()
 	})
 	t.Run("simple", func(t *testing.T) {
-		c, err := NewCache(5, cacheDir)
+		c, err := New(5, cacheDir)
 		require.NoError(t, err, err)
 
 		checkSetItem(t, c, "aaa", false)
@@ -78,7 +79,7 @@ func TestCache(t *testing.T) {
 		c.Clear()
 	})
 	t.Run("purge logic", func(t *testing.T) {
-		c, err := NewCache(10, cacheDir)
+		c, err := New(10, cacheDir)
 		require.NoError(t, err, err)
 
 		checkSetItem(t, c, "aaa", false)
@@ -101,7 +102,7 @@ func TestCache(t *testing.T) {
 
 func TestCacheCapacity(t *testing.T) {
 	t.Run("check cache capacity", func(t *testing.T) {
-		c, err := NewCache(4, cacheDir)
+		c, err := New(4, cacheDir)
 		require.NoError(t, err, err)
 
 		checkSetItem(t, c, "aaa", false)
@@ -117,7 +118,7 @@ func TestCacheCapacity(t *testing.T) {
 }
 
 func TestCacheMultithreading(t *testing.T) {
-	c, err := NewCache(10, cacheDir)
+	c, err := New(10, cacheDir)
 	require.NoError(t, err, err)
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
@@ -132,7 +133,8 @@ func TestCacheMultithreading(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for i := 0; i < 100; i++ {
-			c.Get(Key(strconv.Itoa(rand.Intn(100))))
+			n, _ := rand.Int(rand.Reader, big.NewInt(100))
+			c.Get(Key(strconv.Itoa(int(n.Int64()))))
 		}
 	}()
 

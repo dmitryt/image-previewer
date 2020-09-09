@@ -1,33 +1,26 @@
 package cache
 
 import (
-	"crypto/sha512"
 	"errors"
-	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 
 	"github.com/rs/zerolog/log"
-
-	utils "github.com/dmitryt/image-previewer/internal/utils"
 )
 
-var (
-	ErrIncorrectFilePath = errors.New("incorrect file path")
-)
+var ErrIncorrectFilePath = errors.New("incorrect file path")
 
 type Key string
 
 type Cache interface {
 	Set(key Key, value interface{}) (bool, error)
 	Get(key Key) (interface{}, bool)
-	GetKey(utils.URLParams) Key
 	GetDir() string
-	GetFile(utils.URLParams, int) (*os.File, error)
-	GetFilePath(utils.URLParams) string
+	GetFile(key Key, flag int) (*os.File, error)
+	GetFilePath(key Key) string
+	HasFilePath(key Key) bool
 	Clear()
 }
 
@@ -44,9 +37,10 @@ type cacheItem struct {
 	value interface{}
 }
 
-func NewCache(capacity int, dir string) (Cache, error) {
+func New(capacity int, dir string) (Cache, error) {
 	cache := &lruCache{capacity: capacity, dir: dir, queue: NewList(), items: make(map[Key]*listItem)}
 	err := cache.Init()
+
 	return cache, err
 }
 
@@ -56,10 +50,11 @@ func (c *lruCache) GetDir() string {
 
 func (c *lruCache) Init() error {
 	// Prepare dir
-	err := os.MkdirAll(c.dir, 0755)
+	err := os.MkdirAll(c.dir, 0o755)
 	if err != nil {
 		return err
 	}
+
 	return filepath.Walk(c.dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -70,27 +65,29 @@ func (c *lruCache) Init() error {
 				return err
 			}
 		}
+
 		return nil
 	})
 }
 
-func (c *lruCache) GetFilePath(up utils.URLParams) string {
-	return filepath.Join(c.GetDir(), string(c.GetKey(up)))
+func (c *lruCache) GetFilePath(key Key) string {
+	return filepath.Join(c.GetDir(), string(key))
 }
 
-func (c *lruCache) GetFile(up utils.URLParams, flag int) (*os.File, error) {
-	fpath := c.GetFilePath(up)
+func (c *lruCache) HasFilePath(key Key) bool {
+	filePath := filepath.Join(filepath.Join(c.GetDir(), string(key)))
+	if _, err := os.Stat(filePath); err == nil {
+		return true
+	}
+
+	return false
+}
+
+func (c *lruCache) GetFile(key Key, flag int) (*os.File, error) {
+	fpath := c.GetFilePath(key)
 	log.Debug().Msgf("Getting cache file %s", fpath)
-	return os.OpenFile(fpath, flag, os.ModeAppend)
-}
 
-func (c *lruCache) GetKey(up utils.URLParams) Key {
-	h := sha512.New()
-	str := fmt.Sprintf("%s/%dx%d", up.ExternalURL, up.Width, up.Height)
-	_, _ = io.WriteString(h, str)
-	result := Key([]rune(fmt.Sprintf("%x", h.Sum(nil)))[0:64])
-	log.Debug().Msgf("Getting cache key %s %s", str, result)
-	return result
+	return os.OpenFile(fpath, flag, os.ModeAppend)
 }
 
 func (c *lruCache) Get(key Key) (interface{}, bool) {
@@ -101,6 +98,7 @@ func (c *lruCache) Get(key Key) (interface{}, bool) {
 		return nil, false
 	}
 	c.queue.MoveToFront(item)
+
 	return item.Value.(cacheItem).value, true
 }
 
@@ -112,6 +110,7 @@ func (c *lruCache) AddFile(fpath string) (err error) {
 	}
 	log.Debug().Msgf("created file %s", fpath)
 	defer f.Close()
+
 	return nil
 }
 
@@ -122,6 +121,7 @@ func (c *lruCache) RemoveFile(fpath string) (err error) {
 		return err
 	}
 	log.Debug().Msgf("removed file %s", fpath)
+
 	return nil
 }
 
@@ -132,6 +132,7 @@ func (c *lruCache) processAddFile(fpath string) error {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -165,6 +166,7 @@ func (c *lruCache) Set(key Key, value interface{}) (found bool, err error) {
 		delete(c.items, itemToRemove.Value.(cacheItem).key)
 		c.queue.Remove(itemToRemove)
 	}
+
 	return
 }
 

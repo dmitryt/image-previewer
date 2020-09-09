@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"image"
 	_ "image/gif"
@@ -18,17 +19,25 @@ import (
 
 var comparator = diff.NewBinary()
 
-var (
-	resizedImgsFolder = filepath.Join("testdata", "resized")
-)
+var resizedImgsFolder = filepath.Join("testdata", "resized")
+
+func makeRequest(url string) (resp *http.Response, err error) {
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://localhost:8082"+url, nil)
+	if err != nil {
+		return
+	}
+
+	return http.DefaultClient.Do(req)
+}
 
 func loadImgFromHTTP(url string) (result image.Image, err error) {
-	resp, err := http.Get("http://localhost:8082" + url)
+	resp, err := makeRequest(url)
 	if err != nil {
 		return
 	}
 	defer resp.Body.Close()
 	result, _, err = image.Decode(resp.Body)
+
 	return
 }
 
@@ -92,7 +101,7 @@ func TestResize(t *testing.T) {
 
 func TestNotSupportedFile(t *testing.T) {
 	t.Run("should process not supported files correctly", func(t *testing.T) {
-		resp, err := http.Get("http://localhost:8082/fill/100/100/nginx/sample.pdf")
+		resp, err := makeRequest("/fill/100/100/nginx/sample.pdf")
 		require.NoError(t, err, "Error, while fetching the data")
 		defer resp.Body.Close()
 		data, _ := ioutil.ReadAll(resp.Body)
@@ -104,7 +113,7 @@ func TestNotSupportedFile(t *testing.T) {
 
 func TestFileNotFound(t *testing.T) {
 	t.Run("should process not existing files correctly", func(t *testing.T) {
-		resp, err := http.Get("http://localhost:8082/fill/100/100/nginx/notExist.jpg")
+		resp, err := makeRequest("/fill/100/100/nginx/notExist.jpg")
 		require.NoError(t, err, "Error, while fetching the data")
 		defer resp.Body.Close()
 		data, _ := ioutil.ReadAll(resp.Body)
@@ -116,7 +125,7 @@ func TestFileNotFound(t *testing.T) {
 
 func TestServerNotRespond(t *testing.T) {
 	t.Run("should process problem with server correctly", func(t *testing.T) {
-		resp, err := http.Get("http://localhost:8082/fill/100/100/invalid_server/123.jpg")
+		resp, err := makeRequest("/fill/100/100/invalid_server/123.jpg")
 		require.NoError(t, err, "Error, while fetching the data")
 		defer resp.Body.Close()
 		data, _ := ioutil.ReadAll(resp.Body)
@@ -128,7 +137,7 @@ func TestServerNotRespond(t *testing.T) {
 
 func TestInvalidURI(t *testing.T) {
 	t.Run("should process invalid uri correctly", func(t *testing.T) {
-		resp, err := http.Get("http://localhost:8082/fill/width/height/nginx/123.jpg")
+		resp, err := makeRequest("/fill/width/height/nginx/123.jpg")
 		require.NoError(t, err, "Error, while fetching the data")
 		defer resp.Body.Close()
 		data, _ := ioutil.ReadAll(resp.Body)
